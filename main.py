@@ -2,6 +2,7 @@ from experiment import Experiment, Proportion
 
 experiment = Experiment()
 experiment.read_adjacency_matrix_from_file("Wbig_sparse.txt")
+experiment.reduce_interactions(0.5)
 # experiment.read_adjacency_matrix(makeLin(6))
 
 # experiment.reset()

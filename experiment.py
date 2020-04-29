@@ -212,7 +212,6 @@ class Experiment:
         duration_mean = np.mean(durations)
         self.infected_duration_mean_accum.append(duration_mean)
 
-    # TODO reduce_interactions
     def vaccinate_people(self, amount):
         people_to_vaccinate = []
         n = int(amount / 100 * self.total)
@@ -223,3 +222,10 @@ class Experiment:
                 person.state = State.IMMUNE
                 people_to_vaccinate.append(person)
                 self.immune_people.append(person)
+
+    def reduce_interactions(self, amount):
+        for person in self.people:
+            if random_percentage(amount):
+                for neighbour in person.neighbours:
+                    neighbour.neighbours.remove(person)
+                    person.neighbours.remove(neighbour)
