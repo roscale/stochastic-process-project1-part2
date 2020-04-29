@@ -1,59 +1,72 @@
-from random import randrange
+import random
 from typing import List
 
 from person import Person, State
 from util import random_percentage
 
 
+class Proportion:
+    VALUE = 0
+    PERCENTAGE = 1
+
+
 class Experiment:
     def __init__(self):
         self.iterations = 0
-        self.total = 2000
+        self.iterations_accum = []
+
+        self.beta = None
+        self.mu = None
+
+        self.total = None
         self.people: List[Person] = []
 
         self.infected_people: List[Person] = []
         self.immune_people: List[Person] = []
 
-        for _ in range(self.total):
-            self.people.append(Person())
-
-        # Initially just one is infected
-        self.susceptible_people_history = [self.total - 1]
-        self.infected_people_history = [1]
-        self.immune_people_history = [0]
-
-        self.iterations_accum = []
-        # Remember the number of infected people for each experiment for each time t
+        # The number of infected people for each experiment for each time t
         self.susceptible_people_accum = []
         self.infected_people_accum = []
         self.immune_people_accum = []
 
-        initially_infected = self.people[randrange(self.total)]
-        initially_infected.state = State.INFECTED
-        self.infected_people.append(initially_infected)
+        self.susceptible_people_history = None
+        self.infected_people_history = None
+        self.immune_people_history = None
 
-    def reset(self):
+        # The mean of infected duration for each realisation
+        self.infected_duration_mean_accum = []
+
+    def soft_reset(self):
         self.iterations = 0
-        self.total = 2000
+        self.iterations_accum = []
 
         for person in self.people:
             person.state = State.SUSCEPTIBLE
+            person.infected_duration = 0
 
         self.infected_people: List[Person] = []
         self.immune_people: List[Person] = []
 
-        # Initial conditions
-        self.susceptible_people_history = [self.total - 1]
-        self.infected_people_history = [1]
-        self.immune_people_history = [0]
-
-        initially_infected = self.people[randrange(self.total)]
-        initially_infected.state = State.INFECTED
-        self.infected_people.append(initially_infected)
-
     def read_adjacency_matrix_from_file(self, filepath):
+        # Just count the number of people
+        n_people = -1
         adj_matrix = open(filepath, "r")
+        for line in adj_matrix:
+            indices = [int(x) for x in line.split(" ")]
+            if indices[0] > n_people:
+                n_people = indices[0]
+            if indices[1] > n_people:
+                n_people = indices[1]
+        adj_matrix.close()
 
+        # Prepare the storage for all the people
+        self.people.clear()
+        self.total = n_people
+        for _ in range(self.total):
+            self.people.append(Person())
+
+        # Link all the people
+        adj_matrix = open(filepath, "r")
         for line in adj_matrix:
             indices = line.split(" ")
             i = int(indices[0]) - 1
@@ -62,23 +75,61 @@ class Experiment:
             self.people[i].add_neighbour(self.people[j])
 
     def read_adjacency_matrix(self, matrix):
+        # Prepare the storage for all the people
+        self.people.clear()
+        self.total = len(matrix)
+        for _ in range(self.total):
+            self.people.append(Person())
+
+        # Link all the people
         for i in range(len(matrix)):
             for j in range(len(matrix[0])):
                 self.people[i].add_neighbour(self.people[j])
 
+    # To be called after reading the adjacency matrix or after a soft reset
+    def set_initially_infected(self, proportion, amount):
+        def infect_n_people(n):
+            print(f"INIT {n}")
+            for i in range(n):
+                infected_person = random.choice(self.people)
+                if infected_person not in self.infected_people:
+                    self.infected_people.append(infected_person)
+                    infected_person.state = State.INFECTED
+
+            self.susceptible_people_history = [self.total - n]
+            self.infected_people_history = [n]
+            self.immune_people_history = [0]
+
+        if proportion == Proportion.VALUE:
+            infect_n_people(amount)
+        elif proportion == Proportion.PERCENTAGE:
+            infect_n_people(int(amount / 100 * self.total))
+
+    def set_probabilities(self, beta, mu):
+        self.beta = beta
+        self.mu = mu
+
     def step(self):
         self.iterations += 1
 
-        for infected in self.infected_people.copy():
-            infected_neighbours = infected.infect_neighbours(0.5)
-            self.infected_people.extend(infected_neighbours)
+        infected_people_now = []
+
+        for infected in self.infected_people:
+            infected_neighbours = infected.infect_neighbours(self.beta)
+            infected_people_now.extend(infected_neighbours)
 
         for person in self.people:
-            will_recover = random_percentage(0.2)
-            if person.is_infected() and will_recover:
+            will_recover = random_percentage(self.mu)
+            if person.is_infected() and will_recover and person not in infected_people_now:
                 person.state = State.IMMUNE
                 self.immune_people.append(person)
                 self.infected_people.remove(person)
+
+        self.infected_people.extend(infected_people_now)
+
+        # Increment infected duration
+        for person in self.infected_people:
+            person.infected_duration += 1
 
         self.infected_people_history.append(len(self.infected_people))
         self.immune_people_history.append(len(self.immune_people))
@@ -96,6 +147,8 @@ class Experiment:
         import matplotlib.pyplot as plt
         import numpy as np
         import pandas as pd
+
+        print(f"The mean duration of infected people is {np.mean(self.infected_duration_mean_accum)}")
 
         susceptible_people_means = [np.mean(accum) for accum in self.susceptible_people_accum]
         infected_people_means = [np.mean(accum) for accum in self.infected_people_accum]
@@ -140,3 +193,25 @@ class Experiment:
             if i >= len(self.immune_people_accum):
                 self.immune_people_accum.append([])
             self.immune_people_accum[i].append(n)
+
+        # Take mean of infected duration
+        durations = []
+        for person in self.people:
+            if person.infected_duration > 0:
+                durations.append(person.infected_duration)
+
+        import numpy as np
+        duration_mean = np.mean(durations)
+        self.infected_duration_mean_accum.append(duration_mean)
+
+    # TODO reduce_interactions
+    def vaccinate_people(self, amount):
+        n = int(amount / 100 * self.total)
+        for i in range(n):
+            person = random.choice(self.people)
+            person.state = State.IMMUNE
+            if person in self.infected_people:
+                self.infected_people.remove(person)
+
+        self.susceptible_people_history[0] -= n
+        self.immune_people_history[0] += n

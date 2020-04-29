@@ -13,6 +13,7 @@ class Person:
     def __init__(self):
         self.state = State.SUSCEPTIBLE
         self.neighbours: List[Person] = []
+        self.infected_duration = 0
 
     def add_neighbour(self, person):
         self.neighbours.append(person)
