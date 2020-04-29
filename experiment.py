@@ -29,9 +29,9 @@ class Experiment:
         self.infected_people_accum = []
         self.immune_people_accum = []
 
-        self.susceptible_people_history = None
-        self.infected_people_history = None
-        self.immune_people_history = None
+        self.susceptible_people_history = []
+        self.infected_people_history = []
+        self.immune_people_history = []
 
         # The mean of infected duration for each realisation
         self.infected_duration_mean_accum = []
@@ -43,6 +43,10 @@ class Experiment:
         for person in self.people:
             person.state = State.SUSCEPTIBLE
             person.infected_duration = 0
+
+        self.infected_people_history.clear()
+        self.immune_people_history.clear()
+        self.susceptible_people_history.clear()
 
         self.infected_people: List[Person] = []
         self.immune_people: List[Person] = []
@@ -96,10 +100,6 @@ class Experiment:
                     self.infected_people.append(infected_person)
                     infected_person.state = State.INFECTED
 
-            self.susceptible_people_history = [self.total - n]
-            self.infected_people_history = [n]
-            self.immune_people_history = [0]
-
         if proportion == Proportion.VALUE:
             infect_n_people(amount)
         elif proportion == Proportion.PERCENTAGE:
@@ -108,6 +108,14 @@ class Experiment:
     def set_probabilities(self, beta, mu):
         self.beta = beta
         self.mu = mu
+
+    def prepare_chain(self):
+        n_infected = len([p for p in self.people if p.state == State.INFECTED])
+        n_immune = len([p for p in self.people if p.state == State.IMMUNE])
+
+        self.infected_people_history.append(n_infected)
+        self.immune_people_history.append(n_immune)
+        self.susceptible_people_history.append(self.total - n_infected - n_immune)
 
     def step(self):
         self.iterations += 1
@@ -206,12 +214,12 @@ class Experiment:
 
     # TODO reduce_interactions
     def vaccinate_people(self, amount):
+        people_to_vaccinate = []
         n = int(amount / 100 * self.total)
-        for i in range(n):
-            person = random.choice(self.people)
-            person.state = State.IMMUNE
-            if person in self.infected_people:
-                self.infected_people.remove(person)
 
-        self.susceptible_people_history[0] -= n
-        self.immune_people_history[0] += n
+        while len(people_to_vaccinate) != n:
+            person = random.choice(self.people)
+            if person.state != State.INFECTED:
+                person.state = State.IMMUNE
+                people_to_vaccinate.append(person)
+                self.immune_people.append(person)
