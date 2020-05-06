@@ -35,10 +35,13 @@ class Experiment:
 
         # The mean of infected duration for each realisation
         self.infected_duration_mean_accum = []
+        self.beds = 0
+        self.maximum_occupied_beds = 0  # Could be greater than the total number of beds
+        self.hospitalised_ratio = 0.0
 
     def soft_reset(self):
         self.iterations = 0
-        self.iterations_accum = []
+        # self.iterations_accum = []
 
         for person in self.people:
             person.state = State.SUSCEPTIBLE
@@ -143,6 +146,10 @@ class Experiment:
         self.immune_people_history.append(len(self.immune_people))
         self.susceptible_people_history.append(self.total - len(self.infected_people) - len(self.immune_people))
 
+        n_hospitalised_people = int(self.hospitalised_ratio * len(self.infected_people))
+        if n_hospitalised_people > self.maximum_occupied_beds:
+            self.maximum_occupied_beds = n_hospitalised_people
+
         # print(f"Temps {self.iterations} "
         #       f"I: {len(self.infected_people)} "
         #       f"R: {len(self.immune_people)} "
@@ -162,6 +169,16 @@ class Experiment:
         infected_people_means = [np.mean(accum) for accum in self.infected_people_accum]
         immune_people_means = [np.mean(accum) for accum in self.immune_people_accum]
 
+        n_average_iterations = int(np.mean(self.iterations_accum))
+        # print(f"HUH? {n_average_iterations}")
+
+        # print(self.iterations_accum)
+
+        # return
+        susceptible_people_means = susceptible_people_means[:n_average_iterations]
+        infected_people_means = infected_people_means[:n_average_iterations]
+        immune_people_means = immune_people_means[:n_average_iterations]
+
         data = pd.DataFrame({
             'group_A': susceptible_people_means,
             'group_B': infected_people_means,
@@ -174,7 +191,7 @@ class Experiment:
         # Make the plot
         plt.stackplot(range(1, len(susceptible_people_means) + 1), data_perc["group_A"], data_perc["group_B"],
                       data_perc["group_C"],
-                      labels=['Susceptibles', 'Inféctés', 'Immunisés'],
+                      labels=['Susceptibles', 'Infectés', 'Immunisés'],
                       colors=["yellow", "red", "green"])
         plt.legend(loc='upper right')
         plt.margins(0, 0)
@@ -209,8 +226,9 @@ class Experiment:
                 durations.append(person.infected_duration)
 
         import numpy as np
-        duration_mean = np.mean(durations)
-        self.infected_duration_mean_accum.append(duration_mean)
+        if len(durations) != 0:
+            duration_mean = np.mean(durations)
+            self.infected_duration_mean_accum.append(duration_mean)
 
     def vaccinate_people(self, amount):
         people_to_vaccinate = []
@@ -225,7 +243,17 @@ class Experiment:
 
     def reduce_interactions(self, amount):
         for person in self.people:
-            if random_percentage(amount):
-                for neighbour in person.neighbours:
-                    neighbour.neighbours.remove(person)
-                    person.neighbours.remove(neighbour)
+            n_neighbours_to_remove = int(amount * len(person.neighbours))
+            for _ in range(n_neighbours_to_remove):
+                neighbour_to_remove = random.choice(person.neighbours)
+
+                neighbour_to_remove.neighbours.remove(person)
+                person.neighbours.remove(neighbour_to_remove)
+
+            # if random_percentage(amount):
+            #     for neighbour in person.neighbours:
+
+
+    def set_number_of_beds(self, beds, hospitalised_ratio):
+        self.beds = beds
+        self.hospitalised_ratio = hospitalised_ratio
