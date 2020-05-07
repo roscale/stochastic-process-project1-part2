@@ -1,3 +1,4 @@
+import itertools
 import random
 from typing import List
 
@@ -169,15 +170,21 @@ class Experiment:
         infected_people_means = [np.mean(accum) for accum in self.infected_people_accum]
         immune_people_means = [np.mean(accum) for accum in self.immune_people_accum]
 
+        infected_people_means = list(itertools.takewhile(lambda x: x >= 0.4/100 * self.total, infected_people_means))
+        susceptible_people_means = susceptible_people_means[:len(infected_people_means)]
+        immune_people_means = immune_people_means[:len(infected_people_means)]
+
+        print(infected_people_means)
+
         n_average_iterations = int(np.mean(self.iterations_accum))
         # print(f"HUH? {n_average_iterations}")
 
         # print(self.iterations_accum)
 
         # return
-        susceptible_people_means = susceptible_people_means[:n_average_iterations]
-        infected_people_means = infected_people_means[:n_average_iterations]
-        immune_people_means = immune_people_means[:n_average_iterations]
+        # susceptible_people_means = susceptible_people_means[:n_average_iterations]
+        # infected_people_means = infected_people_means[:n_average_iterations]
+        # immune_people_means = immune_people_means[:n_average_iterations]
 
         data = pd.DataFrame({
             'group_A': susceptible_people_means,
