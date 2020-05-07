@@ -18,10 +18,12 @@ class Experiment:
 
         self.beta = None
         self.mu = None
+        self.immunization_speedup = 1.0
 
         self.total = None
         self.people: List[Person] = []
 
+        self.hospitalized_people = []
         self.infected_people: List[Person] = []
         self.immune_people: List[Person] = []
 
@@ -36,12 +38,14 @@ class Experiment:
 
         # The mean of infected duration for each realisation
         self.infected_duration_mean_accum = []
+
         self.beds = 0
         self.maximum_occupied_beds = 0  # Could be greater than the total number of beds
         self.hospitalised_ratio = 0.0
 
     def soft_reset(self):
         self.iterations = 0
+        self.hospitalized_people = []
         # self.iterations_accum = []
 
         for person in self.people:
@@ -124,20 +128,39 @@ class Experiment:
     def step(self):
         self.iterations += 1
 
+        # Infect others
         infected_people_now = []
-
-        for infected in self.infected_people:
+        for infected in [p for p in self.infected_people if p not in self.hospitalized_people]:
             infected_neighbours = infected.infect_neighbours(self.beta)
             infected_people_now.extend(infected_neighbours)
 
+        # Hospitalise a fixed percentage of new infected people
+        hospitalised_people_now = []
+        n_hospitalised_people_now = int(self.hospitalised_ratio * len(infected_people_now))
+        while len(hospitalised_people_now) != n_hospitalised_people_now:
+            to_be_hospitalised = random.choice(infected_people_now)
+            if to_be_hospitalised not in hospitalised_people_now:
+                hospitalised_people_now.append(to_be_hospitalised)
+
+        # Immunise people
         for person in self.people:
-            will_recover = random_percentage(self.mu)
-            if person.is_infected() and will_recover and person not in infected_people_now:
-                person.state = State.IMMUNE
-                self.immune_people.append(person)
-                self.infected_people.remove(person)
+            if person in self.hospitalized_people and person not in hospitalised_people_now:
+                will_recover = random_percentage(self.mu * self.immunization_speedup)
+                if will_recover:
+                    person.state = State.IMMUNE
+                    self.immune_people.append(person)
+                    self.infected_people.remove(person)
+                    self.hospitalized_people.remove(person)
+
+            elif person.is_infected() and person not in infected_people_now:
+                will_recover = random_percentage(self.mu)
+                if will_recover:
+                    person.state = State.IMMUNE
+                    self.immune_people.append(person)
+                    self.infected_people.remove(person)
 
         self.infected_people.extend(infected_people_now)
+        self.hospitalized_people.extend(hospitalised_people_now)
 
         # Increment infected duration
         for person in self.infected_people:
@@ -147,10 +170,12 @@ class Experiment:
         self.immune_people_history.append(len(self.immune_people))
         self.susceptible_people_history.append(self.total - len(self.infected_people) - len(self.immune_people))
 
-        n_hospitalised_people = int(self.hospitalised_ratio * len(self.infected_people))
+        n_hospitalised_people = len(self.hospitalized_people)
         if n_hospitalised_people > self.maximum_occupied_beds:
             self.maximum_occupied_beds = n_hospitalised_people
 
+
+        print(len(self.hospitalized_people))
         # print(f"Temps {self.iterations} "
         #       f"I: {len(self.infected_people)} "
         #       f"R: {len(self.immune_people)} "
@@ -198,7 +223,7 @@ class Experiment:
         # Make the plot
         plt.stackplot(range(1, len(susceptible_people_means) + 1), data_perc["group_A"], data_perc["group_B"],
                       data_perc["group_C"],
-                      labels=['Susceptibles', 'Infectés', 'Immunisés'],
+                      labels=['Susceptible', 'Infecté', 'Rétablis'],
                       colors=["yellow", "red", "green"])
         plt.legend(loc='upper right')
         plt.margins(0, 0)
@@ -264,3 +289,6 @@ class Experiment:
     def set_number_of_beds(self, beds, hospitalised_ratio):
         self.beds = beds
         self.hospitalised_ratio = hospitalised_ratio
+
+    def give_meds_to_patients(self, immunization_speedup):
+        self.immunization_speedup = immunization_speedup
