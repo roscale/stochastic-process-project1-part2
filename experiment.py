@@ -12,7 +12,8 @@ class Proportion:
 
 
 class Experiment:
-    def __init__(self):
+    def __init__(self, title):
+        self.title = title
         self.iterations = 0
         self.iterations_accum = []
 
@@ -194,12 +195,7 @@ class Experiment:
         susceptible_people_means = susceptible_people_means[:len(infected_people_means)]
         immune_people_means = immune_people_means[:len(infected_people_means)]
 
-        n_average_iterations = int(np.mean(self.iterations_accum))
-        # print(f"HUH? {n_average_iterations}")
-
-        # print(self.iterations_accum)
-
-        # return
+        # n_average_iterations = int(np.mean(self.iterations_accum))
         # susceptible_people_means = susceptible_people_means[:n_average_iterations]
         # infected_people_means = infected_people_means[:n_average_iterations]
         # immune_people_means = immune_people_means[:n_average_iterations]
@@ -214,13 +210,16 @@ class Experiment:
         data_perc = data.divide(data.sum(axis=1), axis=0)
 
         # Make the plot
-        plt.stackplot(range(1, len(susceptible_people_means) + 1), data_perc["group_A"], data_perc["group_B"],
-                      data_perc["group_C"],
-                      labels=['Susceptible', 'Infecté', 'Rétablis'],
-                      colors=["yellow", "red", "green"])
+        plt.stackplot(
+            range(1, len(susceptible_people_means) + 1), data_perc["group_A"], data_perc["group_B"],
+            data_perc["group_C"],
+            labels=['Susceptible', 'Infecté', 'Rétablis'])
         plt.legend(loc='upper right')
         plt.margins(0, 0)
-        plt.title('Simulation')
+        plt.title(self.title)
+        plt.xlabel('temps')
+        plt.ylabel('taux de personnes')
+
         plt.show()
 
     def take_mean(self):
