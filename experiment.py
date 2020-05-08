@@ -102,7 +102,6 @@ class Experiment:
     # To be called after reading the adjacency matrix or after a soft reset
     def set_initially_infected(self, proportion, amount):
         def infect_n_people(n):
-            print(f"INIT {n}")
             for i in range(n):
                 infected_person = random.choice(self.people)
                 if infected_person not in self.infected_people:
@@ -185,7 +184,7 @@ class Experiment:
         import numpy as np
         import pandas as pd
 
-        print(f"The mean duration of infected people is {np.mean(self.infected_duration_mean_accum)}")
+        print(f"The average duration of infected people is {np.mean(self.infected_duration_mean_accum)}")
 
         susceptible_people_means = [np.mean(accum) for accum in self.susceptible_people_accum]
         infected_people_means = [np.mean(accum) for accum in self.infected_people_accum]
