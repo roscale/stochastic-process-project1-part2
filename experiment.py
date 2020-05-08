@@ -36,7 +36,7 @@ class Experiment:
         self.infected_people_history = []
         self.immune_people_history = []
 
-        # The mean of infected duration for each realisation
+        # The mean of infected duration for each experiment
         self.infected_duration_mean_accum = []
 
         self.beds = 0
@@ -46,8 +46,8 @@ class Experiment:
     def soft_reset(self):
         self.iterations = 0
         self.hospitalized_people = []
-        # self.iterations_accum = []
 
+        # Make all the people susceptible again
         for person in self.people:
             person.state = State.SUSCEPTIBLE
             person.infected_duration = 0
@@ -77,7 +77,7 @@ class Experiment:
         for _ in range(self.total):
             self.people.append(Person())
 
-        # Link all the people
+        # Create all the edges of the graph
         adj_matrix = open(filepath, "r")
         for line in adj_matrix:
             indices = line.split(" ")
@@ -93,7 +93,7 @@ class Experiment:
         for _ in range(self.total):
             self.people.append(Person())
 
-        # Link all the people
+        # Create all the edges of the graph
         for i in range(len(matrix)):
             for j in range(len(matrix[0])):
                 self.people[i].add_neighbour(self.people[j])
@@ -117,6 +117,7 @@ class Experiment:
         self.beta = beta
         self.mu = mu
 
+    # Sets the initial data before running the simulation
     def prepare_chain(self):
         n_infected = len([p for p in self.people if p.state == State.INFECTED])
         n_immune = len([p for p in self.people if p.state == State.IMMUNE])
@@ -125,6 +126,7 @@ class Experiment:
         self.immune_people_history.append(n_immune)
         self.susceptible_people_history.append(self.total - n_infected - n_immune)
 
+    # Advances the simulation
     def step(self):
         self.iterations += 1
 
@@ -174,13 +176,6 @@ class Experiment:
         if n_hospitalised_people > self.maximum_occupied_beds:
             self.maximum_occupied_beds = n_hospitalised_people
 
-
-        print(len(self.hospitalized_people))
-        # print(f"Temps {self.iterations} "
-        #       f"I: {len(self.infected_people)} "
-        #       f"R: {len(self.immune_people)} "
-        #       f"S: {self.total - len(self.infected_people) - len(self.immune_people)}")
-
     def virus_is_gone(self):
         return len(self.infected_people) == 0
 
@@ -198,8 +193,6 @@ class Experiment:
         infected_people_means = list(itertools.takewhile(lambda x: x >= 0.4/100 * self.total, infected_people_means))
         susceptible_people_means = susceptible_people_means[:len(infected_people_means)]
         immune_people_means = immune_people_means[:len(infected_people_means)]
-
-        print(infected_people_means)
 
         n_average_iterations = int(np.mean(self.iterations_accum))
         # print(f"HUH? {n_average_iterations}")
@@ -262,6 +255,11 @@ class Experiment:
             duration_mean = np.mean(durations)
             self.infected_duration_mean_accum.append(duration_mean)
 
+    # Various protection methods
+    def set_number_of_beds(self, beds, hospitalised_ratio):
+        self.beds = beds
+        self.hospitalised_ratio = hospitalised_ratio
+
     def vaccinate_people(self, amount):
         people_to_vaccinate = []
         n = int(amount / 100 * self.total)
@@ -281,14 +279,6 @@ class Experiment:
 
                 neighbour_to_remove.neighbours.remove(person)
                 person.neighbours.remove(neighbour_to_remove)
-
-            # if random_percentage(amount):
-            #     for neighbour in person.neighbours:
-
-
-    def set_number_of_beds(self, beds, hospitalised_ratio):
-        self.beds = beds
-        self.hospitalised_ratio = hospitalised_ratio
 
     def give_meds_to_patients(self, immunization_speedup):
         self.immunization_speedup = immunization_speedup
